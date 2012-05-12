@@ -95,7 +95,7 @@ class Option(object):
     long = None
     dest = None
     action = 'store'
-    coerce = lambda o: o
+    coerce = lambda self, o: o
 
     short_circuit = False
 

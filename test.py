@@ -60,11 +60,14 @@ class TestCommand(Command):
 
     summation = SumOption()
     prime = PrimeOption()
+    name = Option(long='--name')
 
     def run_default(self, total, total_is_prime, **kwargs):
         print('total =', total)
         if total_is_prime is not None:
             print('total is prime?', total_is_prime)
+        if kwargs:
+            print('remaining args:', kwargs)
 
 
 if __name__ == '__main__':
