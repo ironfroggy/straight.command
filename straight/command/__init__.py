@@ -12,11 +12,18 @@ class Command(object):
         self.args = {}
         self.remaining = []
 
+        self.loadAttributeOptions()
         self.loadOptionPlugins('straight.command')
 
     def loadOptionPlugins(self, namespace):
-        for plugin in load(namespace, subclasses=OptionsPlugin):
+        for plugin in load(namespace, subclasses=Option):
             self.options.append(plugin())
+
+    def loadAttributeOptions(self):
+        for name in dir(self):
+            value = getattr(self, name)
+            if isinstance(value, Option):
+                self.options.append(value)
 
     def parse(self, arguments):
         self.remaining = arguments[:]
@@ -51,8 +58,12 @@ class Command(object):
 
         if short_circuit is not None:
             short_circuit.run(self)
+        else:
+            for opt in self.options:
+                if not opt.short_circuit:
+                    opt.run(self)
 
-class OptionsPlugin(object):
+class Option(object):
 
     short = None
     long = None
@@ -60,6 +71,8 @@ class OptionsPlugin(object):
     action = 'store'
 
     short_circuit = False
+
+    __counter = 0
     
     def __init__(self, short=None, long=None, dest=None, action=None):
         self.short = short or self.short
@@ -72,6 +85,9 @@ class OptionsPlugin(object):
             self.dest = self.long[2:].replace('-', '_') 
         else:
             self.dest = self.short[1:].replace('-', '_')
+
+        self.__counter += 1
+        self._option_index = self.__counter
 
     def _check_opts(self):
         if not (self.short or self.long):
@@ -91,7 +107,7 @@ class OptionsPlugin(object):
             if args[0] == self.short:
                 action(args, ns, 'short')
                 return
-            elif args[0] == self.long:
+            elif args[0].split('=', 1)[0] == self.long:
                 action(args, ns, 'long')
                 return
         self.default(args, ns)
@@ -99,6 +115,7 @@ class OptionsPlugin(object):
     def action_store(self, args, ns, mode):
         if mode == 'short':
             value = args[:2][1]
+            args[:] = args[2:]
         else:
             value = args.pop(0).split('=', 1)[1]
         ns[self.dest] = value

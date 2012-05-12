@@ -1,7 +1,7 @@
-from straight.command import OptionsPlugin
+from straight.command import Option
 
 
-class VersionOption(OptionsPlugin):
+class VersionOption(Option):
     long = '--version'
     dest = 'version'
     action = 'store_true'
