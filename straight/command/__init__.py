@@ -15,6 +15,8 @@ class Command(object):
         self.loadAttributeOptions()
         self.loadOptionPlugins('straight.command')
 
+        self.options.sort(key=lambda opt: opt.index_for(self))
+
     def loadOptionPlugins(self, namespace):
         for plugin in load(namespace, subclasses=Option):
             self.options.append(plugin())
@@ -88,6 +90,9 @@ class Option(object):
 
         self.__counter += 1
         self._option_index = self.__counter
+
+    def index_for(self, cmd):
+        return self._option_index
 
     def _check_opts(self):
         if not (self.short or self.long):

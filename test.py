@@ -29,9 +29,17 @@ class PrimeOption(Option):
             return True
         if not n & 1:
             return False
-        for x in range(3, int(n**0.5)+1, 2):
+        i = 0
+        for i, x in enumerate(xrange(3, int(n**0.5)+1, 2)):
+            if i > 0 and i % 100000 == 0:
+                print('.', sep='', end='')
+                sys.stdout.flush()
             if n % x == 0:
+                if i >= 100000:
+                    print()
                 return False
+        if i >= 100000:
+            print()
         return True
 
 
