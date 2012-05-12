@@ -10,6 +10,16 @@ class InvalidArgument(ValueError):
 
 
 class Command(object):
+    """Collections and parses options to implement a command.
+
+    Commands can collect options defined as attributes of a subclass or
+    loaded from one or more namespaces, to be loaded by the plug-in
+    loader `straight.command`.
+
+    An instance of Command can be used to `parse()` an argument list,
+    or to `run()` the command, which first parses and then carries out
+    the task the command was meant for.
+    """
 
     version = "unknown"
 
@@ -77,6 +87,8 @@ class Command(object):
                 if not opt.short_circuit:
                     opt.run(self)
 
+        self.run_default(**self.args)
+
 class Option(object):
 
     short = None
@@ -101,7 +113,7 @@ class Option(object):
         elif self.short:
             self.dest = self.short[1:].replace('-', '_')
 
-        self.__counter += 1
+        Option.__counter += 1
         self._option_index = self.__counter
 
     def index_for(self, cmd):

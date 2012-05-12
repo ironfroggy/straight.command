@@ -11,15 +11,14 @@ class PrimeOption(Option):
     short = '-p'
     long = '--prime'
     dest = 'prime'
-    action = 'store'
+    action = 'store_true'
 
     def run(self, cmd):
-        n = cmd.args[self.dest]
-        if n is not None:
-            if self.is_prime(n):
-                print("{0} is prime.".format(n))
-            else:
-                print("{0} is not prime.".format(n))
+        enable = cmd.args[self.dest]
+        if enable is not None:
+            cmd.args['total_is_prime'] = self.is_prime(cmd.args['total'])
+        else:
+            cmd.args['total_is_prime'] = None
 
     def is_prime(self, n):
         n = abs(int(n))
@@ -51,9 +50,8 @@ class SumOption(Option):
     coerce = int
 
     def run(self, cmd):
-        if cmd.args[self.dest]:
-            total = sum(cmd.args[self.dest])
-            print("Total is", total)
+        total = sum(cmd.args.get(self.dest, []))
+        cmd.args['total'] = total
 
 
 class TestCommand(Command):
@@ -63,12 +61,10 @@ class TestCommand(Command):
     summation = SumOption()
     prime = PrimeOption()
 
-    def run(self, arguments):
-        super(TestCommand, self).run(arguments)
-        
-        print()
-        print('args:', self.args)
-        print('remaining:', self.remaining)
+    def run_default(self, total, total_is_prime, **kwargs):
+        print('total =', total)
+        if total_is_prime is not None:
+            print('total is prime?', total_is_prime)
 
 
 if __name__ == '__main__':
