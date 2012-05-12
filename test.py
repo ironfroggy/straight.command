@@ -43,10 +43,24 @@ class PrimeOption(Option):
         return True
 
 
+class SumOption(Option):
+
+    nargs = "?"
+    action = "append"
+    dest = "numbers"
+    coerce = int
+
+    def run(self, cmd):
+        if cmd.args[self.dest]:
+            total = sum(cmd.args[self.dest])
+            print("Total is", total)
+
+
 class TestCommand(Command):
 
     version = "0.1"
 
+    summation = SumOption()
     prime = PrimeOption()
 
     def run(self, arguments):
