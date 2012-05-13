@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import sys
-from straight.command import Command, Option
+from straight.command import Command, Option, SubCommand
 
 
 class PrimeOption(Option):
@@ -54,13 +54,28 @@ class SumOption(Option):
         cmd.args['total'] = total
 
 
-class TestCommand(Command):
+class Rot13Command(Command):
 
     version = "0.1"
+
+    text = Option(dest='original', coerce=unicode)
+
+    def run_default(self, original, **kwargs):
+        print(original, "->", original.encode('rot13'))
+
+
+class Rot13SubCommand(SubCommand):
+    name = 'rot13'
+    command_class = Rot13Command
+
+class TestCommand(Command):
+
+    version = "0.5"
 
     summation = SumOption()
     prime = PrimeOption()
     name = Option(long='--name')
+    rot13 = Rot13SubCommand()
 
     def run_default(self, total, total_is_prime, **kwargs):
         print('total =', total)

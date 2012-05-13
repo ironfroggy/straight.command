@@ -68,12 +68,12 @@ class Command(object):
     def _parse_one(self, arguments):
         c = len(self.remaining)
         for opt in self.options:
-            print(opt.dest, self.remaining)
             opt.parse(self.remaining, self.args)
         return c != len(self.remaining)
 
     def run(self, arguments):
         self.parse(arguments)
+        
         short_circuit = None
         for opt in self.options:
             if opt.short_circuit and self.args[opt.dest]:
@@ -104,11 +104,13 @@ class Option(object):
 
     __counter = 0
     
-    def __init__(self, short=None, long=None, dest=None, action=None):
+    def __init__(self, short=None, long=None, dest=None, action=None, coerce=None):
         self.short = short or self.short
         self.long = long or self.long
         self._check_opts()
         self.action = action or self.action
+        if coerce is not None:
+            self.coerce = coerce
         if dest:
             self.dest = dest
         elif self.long:
@@ -141,9 +143,9 @@ class Option(object):
         except IndexError:
             pass
         else:
-            if args[0] == self.short:
+            if first == self.short:
                 mode = 'short'
-            elif args[0].split('=', 1)[0] == self.long:
+            elif first.split('=', 1)[0] == self.long:
                 mode = 'long'
             elif self.positional:
                 mode = 'positional'
@@ -177,7 +179,10 @@ class Option(object):
 
     def action_store(self, args, ns, mode):
         value = self._next_value(args, mode)   
-        ns[self.dest] = value
+        if ns[self.dest] is None:
+            ns[self.dest] = value
+        else:
+            raise InvalidArgument("Received too many values for positional {0}".format(self))
 
     def action_store_true(self, args, ns, mode):
         args.pop(0)
@@ -194,3 +199,25 @@ class Option(object):
 
     def run(self, cmd):
         return NotImplemented
+
+
+class SubCommand(Option):
+
+    name = None
+    command_class = None
+
+    def parse(self, args, ns):
+        try:
+            first = args[0]
+        except IndexError:
+            pass
+        else:
+            if first == self.name:
+                subcmd = self.command_class()
+                args.pop(0)
+                self.subcmd = subcmd
+                self.subcmd_args = args[:]
+                args[:] = []
+
+    def run(self, cmd):
+        self.subcmd.run(self.subcmd_args)
