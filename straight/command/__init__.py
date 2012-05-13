@@ -8,6 +8,9 @@ from straight.plugin import load
 class InvalidArgument(ValueError):
     pass
 
+class UnknownArguments(ValueError):
+    pass
+
 
 class Command(object):
     """Collections and parses options to implement a command.
@@ -56,9 +59,8 @@ class Command(object):
         self._check_unknown()
 
     def _check_unknown(self):
-        for arg in self.remaining:
-            if arg.startswith('-'):
-                raise ValueError("Unknown argument '{0}'".format(arg))
+        if self.remaining:
+            raise UnknownArguments(self.remaining)
 
     def _parse_defaults(self, arguments):
         return self._parse_one(arguments)
@@ -66,6 +68,7 @@ class Command(object):
     def _parse_one(self, arguments):
         c = len(self.remaining)
         for opt in self.options:
+            print(opt.dest, self.remaining)
             opt.parse(self.remaining, self.args)
         return c != len(self.remaining)
 
