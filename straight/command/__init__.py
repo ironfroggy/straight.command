@@ -202,9 +202,25 @@ class Option(object):
 
 
 class SubCommand(Option):
+    """Implements a "sub-command option", which consumes all the remaining
+    options and delegates them to another Command.
+
+    Requires a name and a Command sub-class to delegate to.
+    """
 
     name = None
     command_class = None
+
+    def __init__(self, name=None, command_class=None, *args, **kwargs):
+        super(SubCommand, self).__init__(*args, **kwargs)
+        if name:
+            self.name = name
+        if command_class:
+            self.command_class = command_class
+
+        if not self.name or not self.command_class:
+            raise TypeError("{0.__class__.__name__} requires both "
+                "`name` and `command_class`.".format(self))
 
     def parse(self, args, ns):
         try:
