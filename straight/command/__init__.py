@@ -7,10 +7,11 @@ from straight.plugin import load
 
 
 class InvalidArgument(ValueError):
-    pass
+    """Raised when an argument is not formatted properly."""
+
 
 class UnknownArguments(ValueError):
-    pass
+    """Raised when an argment does not match any expected options."""
 
 
 class Command(object):
@@ -37,26 +38,37 @@ class Command(object):
         self.options.sort(key=lambda opt: opt.index_for(self))
 
     def loadOptions(self, namespace):
+        """Load options from a plugin namespace, and also from any options
+        defined as part of the class body.
+        """
+
         from_attributes = self._getAttributes(Option)
         from_plugins = self._getPlugins(namespace, Option)
         self.options.extend(from_attributes)
         self.options.extend(from_plugins)
 
     def _getPlugins(self, namespace, cls):
+        """Utility to load and instansiate a set of plugins."""
+
         for plugin in load(namespace, subclasses=cls):
             yield plugin()
 
     def _getAttributes(self, cls):
+        """Utility to locate class-defined options."""
+
         for name in dir(self):
             value = getattr(self, name)
             if isinstance(value, cls):
                 yield value
 
     def parse(self, arguments):
+        """Parse all known arguments, populating the `args` dict."""
+
         self.remaining = arguments[:]
 
         if not self.remaining:
-            self._parse_defaults(arguments)
+            # Parse once, if there are no arguments, to set defaults.
+            self._parse_one(arguments)
         while self.remaining:
             if self._parse_one(arguments):
                 continue
@@ -65,21 +77,36 @@ class Command(object):
         self._check_unknown()
 
     def _check_unknown(self):
+        """Be default, unknown arguments are rejected and parsing
+        terminated.
+        """
+
         if self.remaining:
             raise UnknownArguments(self.remaining)
 
-    def _parse_defaults(self, arguments):
-        return self._parse_one(arguments)
-
     def _parse_one(self, arguments):
+        """Allow each option, in order, to consume arguments from the list if
+        they match its criteria.
+        """
+
         c = len(self.remaining)
         for opt in self.options:
             opt.parse(self.remaining, self.args)
         return c != len(self.remaining)
 
     def run(self, arguments):
+        """Parse arguments and invoke resulting actions."""
+
         self.parse(arguments)
-        
+        self._run(arguments)
+
+    def _run(self, arguments):
+        """If any short_circuit options are matched, and if only one of them
+        is matched, it will be run and nothing else. Otherwise, all options
+        will be run, then the command's `run_default` will be called with
+        the resulting parsed arguments as keyword arguments.
+        """
+
         short_circuit = None
         for opt in self.options:
             if opt.short_circuit and self.args[opt.dest]:
@@ -99,22 +126,42 @@ class Command(object):
         self.run_default(**self.args)
 
 class Option(object):
+    """Defines a single option a command can take.
+
+    Options can define a short (-s) or long (--long) or be positional.
+    
+    Initialization parameters:
+
+    - `short` an optional single-dash (-s) argument to accept
+    - `long` an optional single-dash (--long) argument to accept
+    - `dest` the name to save any resulting values to
+    - `action` the action to peform if an option is matched
+      Can be one of:
+        `store` to accept one value to store 
+        `append` to accept multiple values to store in a list 
+        `store_true` to store True if matched
+        `store_false` to store False if matched
+    - `coerce` a callable accepting the given string value for an option, and
+      returning a value of a correct type
+    - `short_circuit` true if the option can be the only one run
+    """
 
     short = None
     long = None
     dest = None
     action = 'store'
     coerce = lambda self, o: o
-
     short_circuit = False
 
     __counter = 0
     
-    def __init__(self, short=None, long=None, dest=None, action=None, coerce=None):
+    def __init__(self, short=None, long=None, dest=None, action=None, coerce=None, short_circuit = None):
         self.short = short or self.short
         self.long = long or self.long
         self._check_opts()
         self.action = action or self.action
+        if short_circuit is not None:
+            self.short_circuit = short_circuit
         if coerce is not None:
             self.coerce = coerce
         if dest:
@@ -128,6 +175,11 @@ class Option(object):
         self._option_index = self.__counter
 
     def index_for(self, cmd):
+        """Provides the index number to order an option in a command.
+
+        Defaults the order they were created.        
+        """
+
         return self._option_index
 
     def _check_opts(self):
@@ -141,6 +193,10 @@ class Option(object):
             raise ValueError("Long option must begin with -- only.")
 
     def parse(self, args, ns):
+        """Parse the next argument in `args` if it matches this option,
+        and execute its `action` accordingly.
+        """
+
         action = getattr(self, 'action_' + self.action)
         mode = None
         self.default(args, ns)
@@ -162,6 +218,10 @@ class Option(object):
                     print("Unknown parameter:", e.args[0])
 
     def _next_value(self, args, mode):
+        """Consumes the option from the argument list, and any value it
+        accepts.
+        """
+
         consume = 0
         if mode == 'short':
             value = args[:2][1]
@@ -184,6 +244,8 @@ class Option(object):
             raise InvalidArgument(value)
 
     def action_store(self, args, ns, mode):
+        """Action to simple store an expected value."""
+
         value = self._next_value(args, mode)   
         if ns[self.dest] is None:
             ns[self.dest] = value
@@ -191,10 +253,22 @@ class Option(object):
             raise InvalidArgument("Received too many values for positional {0}".format(self))
 
     def action_store_true(self, args, ns, mode):
+        """Action to store True, and not accept a value."""
+
         args.pop(0)
         ns[self.dest] = True
 
+    def action_store_false(self, args, ns, mode):
+        """Action to store False, and not accept a value."""
+
+        args.pop(0)
+        ns[self.dest] = False
+
     def action_append(self, args, ns, mode):
+        """Action to collect all values of the option, if repeated, into a
+        single list.
+        """
+
         if ns.get(self.dest) is None:
             ns[self.dest] = []
         value = self._next_value(args, mode)
@@ -204,6 +278,10 @@ class Option(object):
         ns.setdefault(self.dest, None)
 
     def run(self, cmd):
+        """An Option subclass can define `run()` to invoke some behavior
+        during the commands run-phase, if the option had been matched.
+        """
+
         return NotImplemented
 
 
@@ -231,6 +309,10 @@ class SubCommand(Option):
                 "`name` and `command_class`.".format(self))
 
     def parse(self, args, ns):
+        """Consumes ALL remaining arguments and prepares to send them to the
+        sub-command.
+        """
+
         try:
             first = args[0]
         except IndexError:
@@ -239,9 +321,11 @@ class SubCommand(Option):
             if first == self.name:
                 args.pop(0)
                 self.subcmd = self.command_class()
-                self.subcmd_args = args[:]
+                self.subcmd.parse(args[:])
                 args[:] = []
 
     def run(self, cmd):
+        """Runs the subcommand."""
+
         if self.subcmd is not None:
-            self.subcmd.run(self.subcmd_args)
+            self.subcmd._run(self.subcmd_args)
