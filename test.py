@@ -66,8 +66,8 @@ class TestCommand(Command):
         print('total =', total)
         if total_is_prime is not None:
             print('total is prime?', total_is_prime)
-        if kwargs:
-            print('remaining args:', kwargs)
+        print('unused:', kwargs)
+        print('unparsed:', self.remaining)
 
 
 if __name__ == '__main__':

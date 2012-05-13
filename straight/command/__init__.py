@@ -161,7 +161,7 @@ class Option(object):
                 value = value[1]
             except IndexError:
                 raise InvalidArgument(value)
-            consume = 2
+            consume = 1
         elif mode == 'positional':
             value = args[0]
             consume = 1
