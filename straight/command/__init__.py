@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import re
+from itertools import chain
 
 from straight.plugin import load
 
@@ -31,20 +32,25 @@ class Command(object):
         self.args = {}
         self.remaining = []
 
-        self.loadAttributeOptions()
-        self.loadOptionPlugins('straight.command')
+        self.loadOptions('straight.command')
 
         self.options.sort(key=lambda opt: opt.index_for(self))
 
-    def loadOptionPlugins(self, namespace):
-        for plugin in load(namespace, subclasses=Option):
-            self.options.append(plugin())
+    def loadOptions(self, namespace):
+        from_attributes = self._getAttributes(Option)
+        from_plugins = self._getPlugins(namespace, Option)
+        self.options.extend(from_attributes)
+        self.options.extend(from_plugins)
 
-    def loadAttributeOptions(self):
+    def _getPlugins(self, namespace, cls):
+        for plugin in load(namespace, subclasses=cls):
+            yield plugin()
+
+    def _getAttributes(self, cls):
         for name in dir(self):
             value = getattr(self, name)
-            if isinstance(value, Option):
-                self.options.append(value)
+            if isinstance(value, cls):
+                yield value
 
     def parse(self, arguments):
         self.remaining = arguments[:]
@@ -217,6 +223,8 @@ class SubCommand(Option):
             self.name = name
         if command_class:
             self.command_class = command_class
+        self.subcmd = None
+        self.subcmd_args = None
 
         if not self.name or not self.command_class:
             raise TypeError("{0.__class__.__name__} requires both "
@@ -229,11 +237,11 @@ class SubCommand(Option):
             pass
         else:
             if first == self.name:
-                subcmd = self.command_class()
                 args.pop(0)
-                self.subcmd = subcmd
+                self.subcmd = self.command_class()
                 self.subcmd_args = args[:]
                 args[:] = []
 
     def run(self, cmd):
-        self.subcmd.run(self.subcmd_args)
+        if self.subcmd is not None:
+            self.subcmd.run(self.subcmd_args)
