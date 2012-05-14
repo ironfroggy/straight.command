@@ -14,6 +14,9 @@ class UnknownArguments(ValueError):
     """Raised when an argment does not match any expected options."""
 
 
+_NO_CONST = object()
+
+
 class Command(object):
     """Collections and parses options to implement a command.
 
@@ -163,7 +166,7 @@ class Option(object):
 
     __counter = 0
     
-    def __init__(self, short=None, long=None, dest=None, action=None, coerce=None, short_circuit = None):
+    def __init__(self, short=None, long=None, dest=None, action=None, coerce=None, short_circuit = None, const=_NO_CONST):
         self.short = short or self.short
         self.long = long or self.long
         self._check_opts()
@@ -172,6 +175,7 @@ class Option(object):
             self.short_circuit = short_circuit
         if coerce is not None:
             self.coerce = coerce
+        self.const = const
         if dest:
             self.dest = dest
         elif self.long:
@@ -254,7 +258,10 @@ class Option(object):
     def action_store(self, args, ns, mode):
         """Action to simple store an expected value."""
 
-        value = self._next_value(args, mode)   
+        if self.const is _NO_CONST:
+            value = self._next_value(args, mode)   
+        else:
+            value = self.const
         if ns[self.dest] is None:
             ns[self.dest] = value
         else:
