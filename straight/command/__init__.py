@@ -28,7 +28,8 @@ class Command(object):
 
     version = "unknown"
 
-    def __init__(self):
+    def __init__(self, parent=None):
+        self.parent = parent
         self.options = []
         self.args = {}
         self.remaining = []
@@ -124,6 +125,9 @@ class Command(object):
                     opt.run(self)
 
         self.run_default(**self.args)
+
+    def run_default(self, **kwargs):
+        pass
 
 class Option(object):
     """Defines a single option a command can take.
@@ -320,12 +324,12 @@ class SubCommand(Option):
         else:
             if first == self.name:
                 args.pop(0)
-                self.subcmd = self.command_class()
-                self.subcmd.parse(args[:])
+                self.subcmd_args = args[:]
                 args[:] = []
 
     def run(self, cmd):
         """Runs the subcommand."""
 
-        if self.subcmd is not None:
-            self.subcmd._run(self.subcmd_args)
+        if self.subcmd_args is not None:
+            self.subcmd = self.command_class(parent=cmd)
+            self.subcmd.run(self.subcmd_args)
