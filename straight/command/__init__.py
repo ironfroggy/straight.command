@@ -150,6 +150,10 @@ class Option(object):
     - `short_circuit` true if the option can be the only one run
     """
 
+    _DEFAULT = {
+        'append': list,
+    }
+
     short = None
     long = None
     dest = None
@@ -279,7 +283,7 @@ class Option(object):
         ns[self.dest].append(value)
 
     def default(self, args, ns):
-        ns.setdefault(self.dest, None)
+        ns.setdefault(self.dest, self._DEFAULT.get(self.action, lambda:None)())
 
     def run(self, cmd):
         """An Option subclass can define `run()` to invoke some behavior
