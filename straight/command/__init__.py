@@ -157,31 +157,32 @@ class Option(object):
         'append': list,
     }
 
-    short = None
-    long = None
-    dest = None
-    action = 'store'
-    coerce = lambda self, o: o
-    short_circuit = False
+    defaults = (
+        ('short', None),
+        ('long', None),
+        ('dest', None),
+        ('nargs', "?"),
+        ('action', 'store'),
+        ('coerce', (lambda o: o)),
+        ('short_circuit', False),
+        ('const', _NO_CONST),
+    )
 
     __counter = 0
     
-    def __init__(self, short=None, long=None, dest=None, action=None, coerce=None, short_circuit = None, const=_NO_CONST):
-        self.short = short or self.short
-        self.long = long or self.long
+    def __init__(self, **kwargs):
+        for (defname, defvalue) in self.defaults:
+            if defname in kwargs:
+                setattr(self, defname, kwargs[defname])
+            if not hasattr(self, defname):
+                setattr(self, defname, dict(self.defaults)[defname])
+
         self._check_opts()
-        self.action = action or self.action
-        if short_circuit is not None:
-            self.short_circuit = short_circuit
-        if coerce is not None:
-            self.coerce = coerce
-        self.const = const
-        if dest:
-            self.dest = dest
-        elif self.long:
-            self.dest = self.long[2:].replace('-', '_') 
-        elif self.short:
-            self.dest = self.short[1:].replace('-', '_')
+        if self.dest is None:
+            if self.long:
+                self.dest = self.long[2:].replace('-', '_') 
+            elif self.short:
+                self.dest = self.short[1:].replace('-', '_')
 
         Option.__counter += 1
         self._option_index = self.__counter
