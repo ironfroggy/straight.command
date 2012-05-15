@@ -173,9 +173,12 @@ class Option(object):
     def __init__(self, **kwargs):
         for (defname, defvalue) in self.defaults:
             if defname in kwargs:
-                setattr(self, defname, kwargs[defname])
+                setattr(self, defname, kwargs.pop(defname))
             if not hasattr(self, defname):
                 setattr(self, defname, dict(self.defaults)[defname])
+        if kwargs:
+            raise TypeError("Unexpected initialization parameters: " +
+                ', '.join(kwargs.keys()))
 
         self._check_opts()
         if self.dest is None:
