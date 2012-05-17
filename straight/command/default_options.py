@@ -1,3 +1,6 @@
+"""Default options inherited by all commands."""
+
+
 from straight.command import Option
 
 

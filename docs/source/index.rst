@@ -33,6 +33,7 @@ Example
 
     class Add(Command):
         new_todo = Option(dest='new_todo', action='append')
+
         def run_default(self, new_todo, **extra):
             with open(self.parent.args['filename'], 'a') as f:
                 for one_todo in new_todo:
@@ -48,10 +49,24 @@ Example
         Todo().run(sys.argv[1:])
 
 
+This example shows several commands with declaratively defined options,
+including two of them being declared as subcommands of the third.
+
+We can see a number of the features of ``straight.command`` in this example.
+
+Command options are declared with instances of ``Option`` assigned in the
+``Command`` subclass, much like the declarative nature of many ORM tools
+declaring table columns, so this should be familiar to many developers.
+
+API Documentation
+-----------------
+
+* :doc:`modules`
+* :doc:`command`
+
 Indices and tables
 ==================
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-

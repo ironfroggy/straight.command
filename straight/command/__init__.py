@@ -1,3 +1,7 @@
+"""A command framework with a plugin architecture.
+
+"""
+
 from __future__ import print_function
 
 import re
@@ -44,6 +48,16 @@ class Command(object):
     def loadOptions(self, namespace):
         """Load options from a plugin namespace, and also from any options
         defined as part of the class body.
+
+        The namespace is used to search all your available python packages
+        and locate anything within that namespace. By default, the namespace
+        ``"straight.command"`` is used to locate default options, which
+        are found in the ``straight.command.default_options`` module.
+
+        Your application can define its own namespace where you can easily
+        add options to be located, and if you document this namespace other
+        developers can extend your commands with new options by providing
+        namespace packages with their own options plugins.
         """
 
         from_attributes = self._getAttributes(Option)
@@ -294,6 +308,8 @@ class Option(object):
         ns[self.dest].append(value)
 
     def default(self, args, ns):
+        """Assigns default values to the destination."""
+
         ns.setdefault(self.dest, self._DEFAULT.get(self.action, lambda:None)())
 
     def run(self, cmd):
