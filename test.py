@@ -60,7 +60,7 @@ class Rot13Command(Command):
 
     text = Option(dest='original', coerce=unicode)
 
-    def run_default(self, original, **kwargs):
+    def execute(self, original, **kwargs):
         print(original, "->", original.encode('rot13'))
 
 
@@ -77,7 +77,7 @@ class TestCommand(Command):
     name = Option(long='--name')
     rot13 = Rot13SubCommand()
 
-    def run_default(self, total, total_is_prime, **kwargs):
+    def execute(self, total, total_is_prime, **kwargs):
         print('total =', total)
         if total_is_prime is not None:
             print('total is prime?', total_is_prime)

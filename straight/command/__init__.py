@@ -121,7 +121,7 @@ class Command(object):
     def _run(self, arguments):
         """If any short_circuit options are matched, and if only one of them
         is matched, it will be run and nothing else. Otherwise, all options
-        will be run, then the command's `run_default` will be called with
+        will be run, then the command's `execute` will be called with
         the resulting parsed arguments as keyword arguments.
         """
 
@@ -141,9 +141,9 @@ class Command(object):
                 if not opt.short_circuit:
                     opt.run(self)
 
-        self.run_default(**self.args)
+        self.execute(**self.args)
 
-    def run_default(self, **kwargs):
+    def execute(self, **kwargs):
         pass
 
 class Option(object):

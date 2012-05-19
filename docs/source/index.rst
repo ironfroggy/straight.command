@@ -58,6 +58,47 @@ Command options are declared with instances of ``Option`` assigned in the
 ``Command`` subclass, much like the declarative nature of many ORM tools
 declaring table columns, so this should be familiar to many developers.
 
+The Command Processing Phases
+-----------------------------
+
+The command structure and the processing of commands is defined carefully
+in a series of phases of parsing, preparing, and executing. Running the
+command passes through each of these phases to collect the parameters,
+process them, and execute the command.
+
+* **Parse** The command line parameters are parsed into their components.
+* **Prepare** The command is prepared according to the parameters provided.
+* **Execute** The command is finally executed.
+
+Parse
+'''''
+
+The command line arguments are broken into a list of strings, and passed
+into the process. The ``Command`` will parse these option strings by passing all
+of them to each ``Option`` it has, giving each option a chance to consume one
+or more of the parameters, if it can. Once all of the parameters have been
+consumed, or none of the options are able to consume any of the remaining
+parameters, the parsing is complete.
+
+Prepare
+'''''''
+
+Then an option is able to consume one or more of the parameter strings for
+the command, it `prepares` the command in some way. It may store a value
+provided by the option, set a flag, or even enable some specific task the
+command should perform, such as reporting help text about itself.
+
+The options prepare by invoking an `action`.
+
+Execute
+'''''''
+
+After all the parameters are consumed by the options, the command itself
+will execute. This is done by calling the ``execute()`` method on the
+command, which is passed all the collected parameter values as keyword
+arguments.
+
+
 API Documentation
 -----------------
 
