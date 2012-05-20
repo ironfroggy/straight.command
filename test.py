@@ -12,6 +12,7 @@ class PrimeOption(Option):
     long = '--prime'
     dest = 'prime'
     action = 'store_true'
+    nargs = 1
 
     def run(self, cmd):
         enable = cmd.args[self.dest]
@@ -44,7 +45,7 @@ class PrimeOption(Option):
 
 class SumOption(Option):
 
-    nargs = "?"
+    nargs = "3"
     action = "append"
     dest = "numbers"
     coerce = int
@@ -73,6 +74,7 @@ class TestCommand(Command):
     version = "0.5"
 
     summation = SumOption()
+    summation2 = SumOption(dest='total2')
     prime = PrimeOption()
     name = Option(long='--name')
     rot13 = Rot13SubCommand()
@@ -82,7 +84,6 @@ class TestCommand(Command):
         if total_is_prime is not None:
             print('total is prime?', total_is_prime)
         print('unused:', kwargs)
-        print('unparsed:', self.remaining)
 
 
 if __name__ == '__main__':

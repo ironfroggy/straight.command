@@ -38,8 +38,8 @@ class Command(object):
     def __init__(self, parent=None):
         self.parent = parent
         self.options = []
+        self.consumers = []
         self.args = {}
-        self.remaining = []
 
         self.loadOptions('straight.command')
 
@@ -82,35 +82,34 @@ class Command(object):
     def parse(self, arguments):
         """Parse all known arguments, populating the `args` dict."""
 
-        self.remaining = arguments[:]
+        arguments = list(arguments)
 
-        if not self.remaining:
+        consumers = []
+        for opt in self.options:
+            consumer = Consumer(opt, arguments)
+            consumers.append(consumer)
+
+        if not arguments:
             # Parse once, if there are no arguments, to set defaults.
-            self._parse_one(arguments)
-        while self.remaining:
-            if self._parse_one(arguments):
+            self._parse_one(consumers)
+        while arguments:
+            if self._parse_one(consumers):
                 continue
             else:
                 break
-        self._check_unknown()
 
-    def _check_unknown(self):
-        """Be default, unknown arguments are rejected and parsing
-        terminated.
-        """
+        if arguments:
+            raise UnknownArguments(arguments)
 
-        if self.remaining:
-            raise UnknownArguments(self.remaining)
-
-    def _parse_one(self, arguments):
+    def _parse_one(self, consumers):
         """Allow each option, in order, to consume arguments from the list if
         they match its criteria.
         """
 
-        c = len(self.remaining)
-        for opt in self.options:
-            opt.parse(self.remaining, self.args)
-        return c != len(self.remaining)
+        c = consumers[0].remaining()
+        for consumer in consumers:
+            consumer.option.parse(consumer, self.args)
+        return c != consumers[0].remaining()
 
     def run(self, arguments):
         """Parse arguments and invoke resulting actions."""
@@ -145,6 +144,51 @@ class Command(object):
 
     def execute(self, **kwargs):
         pass
+
+
+class Consumer(object):
+    """Takes arguments from the argument list, which match the option the
+    consumer is assigned to.
+    """
+
+    def __init__(self, option, args):
+        self.option = option
+        self.nargs = option.nargs
+        self.args = args
+
+    def remaining(self):
+        return len(self.args)
+
+    def peek(self):
+        return self.args[0]
+
+    def consume(self, mode):
+        """Consumes the option from the argument list, and any value it
+        accepts.
+        """
+
+        args = self.args
+        consume = 0
+        if mode == 'short':
+            value = args[:2][1]
+            consume = 2
+        elif mode == 'long':
+            try:
+                value = args[0].split('=', 1)
+                value = value[1]
+            except IndexError:
+                raise InvalidArgument(value)
+            consume = 1
+        elif mode == 'positional':
+            value = args[0]
+            consume = 1
+        try:
+            coerced_value = self.option.coerce(value)
+            args[:consume] = []
+            return coerced_value
+        except ValueError:
+            raise InvalidArgument(value)
+
 
 class Option(object):
     """Defines a single option a command can take.
@@ -222,16 +266,16 @@ class Option(object):
         if self.long and not re.match(r'--\w[\w\-]*', self.long):
             raise ValueError("Long option must begin with -- only.")
 
-    def parse(self, args, ns):
+    def parse(self, consumer, ns):
         """Parse the next argument in `args` if it matches this option,
         and execute its `action` accordingly.
         """
 
         action = getattr(self, 'action_' + self.action)
         mode = None
-        self.default(args, ns)
+        self.default(ns)
         try:
-            first = args[0]
+            first = consumer.peek()
         except IndexError:
             pass
         else:
@@ -243,41 +287,15 @@ class Option(object):
                 mode = 'positional'
             if mode:
                 try:
-                    action(args, ns, mode)
+                    action(consumer, ns, mode)
                 except InvalidArgument as e:
                     print("Unknown parameter:", e.args[0])
 
-    def _next_value(self, args, mode):
-        """Consumes the option from the argument list, and any value it
-        accepts.
-        """
-
-        consume = 0
-        if mode == 'short':
-            value = args[:2][1]
-            consume = 2
-        elif mode == 'long':
-            try:
-                value = args[0].split('=', 1)
-                value = value[1]
-            except IndexError:
-                raise InvalidArgument(value)
-            consume = 1
-        elif mode == 'positional':
-            value = args[0]
-            consume = 1
-        try:
-            coerced_value = self.coerce(value)
-            args[:consume] = []
-            return coerced_value
-        except ValueError:
-            raise InvalidArgument(value)
-
-    def action_store(self, args, ns, mode):
+    def action_store(self, consumer, ns, mode):
         """Action to simple store an expected value."""
 
         if self.const is _NO_CONST:
-            value = self._next_value(args, mode)   
+            value = consumer.consume(mode)   
         else:
             value = self.const
         if ns[self.dest] is None:
@@ -285,29 +303,29 @@ class Option(object):
         else:
             raise InvalidArgument("Received too many values for positional {0}".format(self))
 
-    def action_store_true(self, args, ns, mode):
+    def action_store_true(self, consumer, ns, mode):
         """Action to store True, and not accept a value."""
 
-        args.pop(0)
+        consumer.args.pop(0)
         ns[self.dest] = True
 
-    def action_store_false(self, args, ns, mode):
+    def action_store_false(self, consumer, ns, mode):
         """Action to store False, and not accept a value."""
 
-        args.pop(0)
+        consumer.args.pop(0)
         ns[self.dest] = False
 
-    def action_append(self, args, ns, mode):
+    def action_append(self, consumer, ns, mode):
         """Action to collect all values of the option, if repeated, into a
         single list.
         """
 
         if ns.get(self.dest) is None:
             ns[self.dest] = []
-        value = self._next_value(args, mode)
+        value = consumer.consume(mode)
         ns[self.dest].append(value)
 
-    def default(self, args, ns):
+    def default(self, ns):
         """Assigns default values to the destination."""
 
         ns.setdefault(self.dest, self._DEFAULT.get(self.action, lambda:None)())
@@ -343,20 +361,20 @@ class SubCommand(Option):
             raise TypeError("{0.__class__.__name__} requires both "
                 "`name` and `command_class`.".format(self))
 
-    def parse(self, args, ns):
+    def parse(self, consumer, ns):
         """Consumes ALL remaining arguments and prepares to send them to the
         sub-command.
         """
 
         try:
-            first = args[0]
+            first = consumer.peek()
         except IndexError:
             pass
         else:
             if first == self.name:
-                args.pop(0)
-                self.subcmd_args = args[:]
-                args[:] = []
+                consumer.args.pop(0)
+                self.subcmd_args = consumer.args[:]
+                consumer.args[:] = []
 
     def run(self, cmd):
         """Runs the subcommand."""
