@@ -86,6 +86,8 @@ class Command(object):
 
         consumers = []
         for opt in self.options:
+            if opt.dest:
+                self.args.setdefault(opt.dest, opt.default())
             consumer = Consumer(opt, arguments)
             consumers.append(consumer)
 
@@ -108,7 +110,8 @@ class Command(object):
 
         c = consumers[0].remaining()
         for consumer in consumers:
-            consumer.option.parse(consumer, self.args)
+            if consumer.nargs and consumer.option.parse(consumer, self.args):
+                break
         return c != consumers[0].remaining()
 
     def run(self, arguments):
@@ -140,6 +143,7 @@ class Command(object):
                 if not opt.short_circuit:
                     opt.run(self)
 
+        print("executing with args", self.args)
         self.execute(**self.args)
 
     def execute(self, **kwargs):
@@ -185,6 +189,11 @@ class Consumer(object):
         try:
             coerced_value = self.option.coerce(value)
             args[:consume] = []
+            try:
+                self.nargs = int(self.nargs) - 1
+            except ValueError:
+                if self.nargs == '?':
+                    self.nargs = 0
             return coerced_value
         except ValueError:
             raise InvalidArgument(value)
@@ -248,6 +257,9 @@ class Option(object):
         Option.__counter += 1
         self._option_index = self.__counter
 
+    def default(self):
+        return None
+
     def index_for(self, cmd):
         """Provides the index number to order an option in a command.
 
@@ -265,6 +277,11 @@ class Option(object):
             raise ValueError("Short option must begin with - only.")
         if self.long and not re.match(r'--\w[\w\-]*', self.long):
             raise ValueError("Long option must begin with -- only.")
+        try:
+            int(self.nargs)
+        except ValueError:
+            if self.nargs not in '?*':
+                raise ValueError("nargs must be an integer, ?, or *")
 
     def parse(self, consumer, ns):
         """Parse the next argument in `args` if it matches this option,
@@ -273,7 +290,6 @@ class Option(object):
 
         action = getattr(self, 'action_' + self.action)
         mode = None
-        self.default(ns)
         try:
             first = consumer.peek()
         except IndexError:
@@ -288,8 +304,10 @@ class Option(object):
             if mode:
                 try:
                     action(consumer, ns, mode)
+                    return True
                 except InvalidArgument as e:
                     print("Unknown parameter:", e.args[0])
+        return False
 
     def action_store(self, consumer, ns, mode):
         """Action to simple store an expected value."""
@@ -324,11 +342,6 @@ class Option(object):
             ns[self.dest] = []
         value = consumer.consume(mode)
         ns[self.dest].append(value)
-
-    def default(self, ns):
-        """Assigns default values to the destination."""
-
-        ns.setdefault(self.dest, self._DEFAULT.get(self.action, lambda:None)())
 
     def run(self, cmd):
         """An Option subclass can define `run()` to invoke some behavior

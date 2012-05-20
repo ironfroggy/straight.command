@@ -47,12 +47,15 @@ class SumOption(Option):
 
     nargs = "3"
     action = "append"
-    dest = "numbers"
+    dest = "total"
     coerce = int
+
+    def default(self):
+        return []
 
     def run(self, cmd):
         total = sum(cmd.args.get(self.dest, []))
-        cmd.args['total'] = total
+        cmd.args[self.dest] = total
 
 
 class Rot13Command(Command):
