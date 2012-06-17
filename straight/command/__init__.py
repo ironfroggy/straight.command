@@ -143,8 +143,8 @@ class Command(object):
                 if not opt.short_circuit:
                     opt.run(self)
 
-        print("executing with args", self.args)
-        self.execute(**self.args)
+            print("executing with args", self.args)
+            self.execute(**self.args)
 
     def execute(self, **kwargs):
         pass
@@ -233,6 +233,7 @@ class Option(object):
         ('coerce', (lambda o: o)),
         ('short_circuit', False),
         ('const', _NO_CONST),
+        ('help', ''),
     )
 
     __counter = 0

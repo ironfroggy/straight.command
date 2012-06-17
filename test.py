@@ -13,6 +13,7 @@ class PrimeOption(Option):
     dest = 'prime'
     action = 'store_true'
     nargs = 1
+    help = "Determine if the number is a prime number."
 
     def run(self, cmd):
         enable = cmd.args[self.dest]
@@ -82,7 +83,7 @@ class TestCommand(Command):
     name = Option(long='--name')
     rot13 = Rot13SubCommand()
 
-    def execute(self, total, total_is_prime, **kwargs):
+    def execute(self, total=None, total_is_prime=False, **kwargs):
         print('total =', total)
         if total_is_prime is not None:
             print('total is prime?', total_is_prime)
