@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='straight.command',
-    version='0.1a2',
+    version='0.1a3',
     description='A command framework with a plugin architecture',
     author='Calvin Spealman',
     author_email='ironfroggy@gmail.com',
