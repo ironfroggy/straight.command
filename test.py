@@ -63,7 +63,7 @@ class Rot13Command(Command):
 
     version = "0.1"
 
-    text = Option(dest='original', coerce=unicode)
+    text = Option(dest='original', coerce=unicode, nargs=1)
 
     def execute(self, original, **kwargs):
         print(original, "->", original.encode('rot13'))

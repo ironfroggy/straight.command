@@ -18,7 +18,15 @@ class UnknownArguments(ValueError):
     """Raised when an argment does not match any expected options."""
 
 
-_NO_CONST = object()
+class _FLAG(object):
+    def __init__(self, f=True):
+        self.f = f
+    def __nonzero__(self):
+        return bool(self.f)
+
+_NO_CONST = _FLAG()
+_NO_DEFAULT = _FLAG(False)
+_NO_VALUE = _FLAG(False)
 
 
 class Command(object):
@@ -87,7 +95,12 @@ class Command(object):
         consumers = []
         for opt in self.options:
             if opt.dest:
-                self.args.setdefault(opt.dest, opt.default())
+                default = opt.default
+                if hasattr(default, '__call__'):
+                    default = default()
+                elif default is _NO_DEFAULT:
+                    default = _NO_VALUE
+                self.args.setdefault(opt.dest, default)
             consumer = Consumer(opt, arguments)
             consumers.append(consumer)
 
@@ -118,9 +131,12 @@ class Command(object):
         """Parse arguments and invoke resulting actions."""
 
         self.parse(arguments)
-        self._run(arguments)
+        self._run()
 
-    def _run(self, arguments):
+    def before_opts(self):
+        pass
+
+    def _run(self):
         """If any short_circuit options are matched, and if only one of them
         is matched, it will be run and nothing else. Otherwise, all options
         will be run, then the command's `execute` will be called with
@@ -136,6 +152,8 @@ class Command(object):
                     raise ValueError("More than one short circuit option!"
                         "Cannot mix {0} and {1}!".format(short_circuit, opt))
 
+        self.before_opts()
+
         if short_circuit is not None:
             short_circuit.run(self)
         else:
@@ -143,7 +161,10 @@ class Command(object):
                 if not opt.short_circuit:
                     opt.run(self)
 
-            print("executing with args", self.args)
+            for opt in self.options:
+                if opt.dest and self.args[opt.dest] is _NO_DEFAULT:
+                    del self.args[opt.dest]
+
             self.execute(**self.args)
 
     def execute(self, **kwargs):
@@ -159,6 +180,9 @@ class Consumer(object):
         self.option = option
         self.nargs = option.nargs
         self.args = args
+
+    def __repr__(self):
+        return "<Consumer: {0.option} dest={0.option.dest}>".format(self)
 
     def remaining(self):
         return len(self.args)
@@ -224,6 +248,7 @@ class Option(object):
         'append': list,
     }
 
+    
     defaults = (
         ('short', None),
         ('long', None),
@@ -233,6 +258,7 @@ class Option(object):
         ('coerce', (lambda o: o)),
         ('short_circuit', False),
         ('const', _NO_CONST),
+        ('default', _NO_DEFAULT),
         ('help', ''),
     )
 
@@ -257,9 +283,6 @@ class Option(object):
 
         Option.__counter += 1
         self._option_index = self.__counter
-
-    def default(self):
-        return None
 
     def index_for(self, cmd):
         """Provides the index number to order an option in a command.
@@ -307,7 +330,9 @@ class Option(object):
                     action(consumer, ns, mode)
                     return True
                 except InvalidArgument as e:
-                    print("Unknown parameter:", e.args[0])
+                    # If we are consuming a multi-positional, move on, we're done
+                    if not consumer.option.positional:
+                        print("Unknown parameter:", e.args[0])
         return False
 
     def action_store(self, consumer, ns, mode):
@@ -317,7 +342,7 @@ class Option(object):
             value = consumer.consume(mode)   
         else:
             value = self.const
-        if ns[self.dest] is None:
+        if ns[self.dest] is _NO_VALUE:
             ns[self.dest] = value
         else:
             raise InvalidArgument("Received too many values for positional {0}".format(self))
