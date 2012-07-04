@@ -342,10 +342,7 @@ class Option(object):
             value = consumer.consume(mode)   
         else:
             value = self.const
-        if ns[self.dest] is _NO_VALUE:
-            ns[self.dest] = value
-        else:
-            raise InvalidArgument("Received too many values for positional {0}".format(self))
+        ns[self.dest] = value
 
     def action_store_true(self, consumer, ns, mode):
         """Action to store True, and not accept a value."""
