@@ -392,6 +392,11 @@ class SubCommand(Option):
             self.command_class = command_class
         self.subcmd = None
         self.subcmd_args = None
+        if not self.help:
+            self.help = getattr(command_class, 'help', None)
+        if not self.help:
+            docstring = getattr(command_class, '__doc__', None) or ''
+            self.help = docstring.split('\n')[0]
 
         if not self.name or not self.command_class:
             raise TypeError("{0.__class__.__name__} requires both "

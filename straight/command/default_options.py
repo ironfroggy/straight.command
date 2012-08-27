@@ -10,6 +10,8 @@ class VersionOption(Option):
     dest = 'version'
     action = 'store_true'
 
+    help = "Report the current version of a command or subcommand."
+
     short_circuit = True
 
     def run(self, cmd):
@@ -22,16 +24,38 @@ class Help(Option):
     dest = 'help'
     action = 'store_true'
 
+    help = "Print this help message."
+
     short_circuit = True
 
     def run(self, cmd):
         helps = []
         ml = {}
+
+        def orempty(n, fmt="%s"):
+            default = getattr(opt, n, None) or ''
+            if default:
+                return fmt % (default,)
+            return default
+        def printhelps(opt, *props, **kwargs):
+            indent = kwargs.get('indent', 0)
+            print(' ' * indent, end='')
+            for prop in props:
+                print(help[prop].ljust(ml[prop]), end=' ')
+
         for opt in cmd.options:
-            helps.append({
-                'flags': ', '.join((opt.short or '', opt.long or '', opt.help or '')).strip(', '),
-            })
-            ml['flags'] = max(ml.get('flags', 0), len(helps[-1]['flags']))
-        for h in helps:
-            print(h['flags'].ljust(ml['flags']))
+            opt_help = {}
+
+            opt_help['flags'] = ', '.join((orempty('short'), orempty('long'))).strip(', ')
+            opt_help['name'] = orempty('name')
+            opt_help['default'] = orempty('default', "(%s)")
+            opt_help['desc'] = orempty('help')
+
+            for k in opt_help:
+                ml[k] = max(ml.get(k, 0), len(opt_help[k]))
+
+            helps.append(opt_help)
+        for help in helps:
+            printhelps(help, 'flags', 'default', 'name', 'desc')
+            print()
         
