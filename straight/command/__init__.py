@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 
+import sys
 import re
 from itertools import chain
 
@@ -21,12 +22,36 @@ class UnknownArguments(ValueError):
 class _FLAG(object):
     def __init__(self, f=True):
         self.f = f
-    def __nonzero__(self):
+    def __bool__(self):
         return bool(self.f)
 
 _NO_CONST = _FLAG()
 _NO_DEFAULT = _FLAG(False)
 _NO_VALUE = _FLAG(False)
+
+class Arguments(dict):
+    def __init__(self, data=None, parent=None):
+        super(Arguments, self).__init__(data or {})
+        self.__parent = parent
+    def __getitem__(self, name):
+        try:
+            return super(Arguments, self).__getitem__(name)
+        except KeyError:
+            if self.__parent is not None:
+                return self.__parent.args[name]
+            raise
+    def get(self, name, default=None):
+        try:
+            return self[name]
+        except KeyError:
+            if self.__parent is not None:
+                return self.__parent.args[name]
+            return default
+    def __getattr__(self, name):
+        try:
+            return self[name]
+        except KeyError:
+            raise AttributeError("No such argument '%s'" % (name,))
 
 
 class Command(object):
@@ -47,7 +72,7 @@ class Command(object):
         self.parent = parent
         self.options = []
         self.consumers = []
-        self.args = {}
+        self.args = Arguments(parent=parent)
 
         self.loadOptions('straight.command')
 
@@ -69,8 +94,17 @@ class Command(object):
         """
 
         from_attributes = self._getAttributes(Option)
+        from_nested_commands = self._getAttributes(sub=Command)
         from_plugins = self._getPlugins(namespace, Option)
+
+        nested_subcommands = []
+        for command in from_nested_commands:
+            nested_subcommands.append(
+                SubCommand(command.__name__.lower().replace('_', '-'), command)
+            )
+
         self.options.extend(from_attributes)
+        self.options.extend(nested_subcommands)
         self.options.extend(from_plugins)
 
     def _getPlugins(self, namespace, cls):
@@ -79,13 +113,19 @@ class Command(object):
         for plugin in load(namespace, subclasses=cls):
             yield plugin()
 
-    def _getAttributes(self, cls):
+    def _getAttributes(self, cls=None, sub=None):
         """Utility to locate class-defined options."""
+
+        assert cls or sub
 
         for name in dir(self):
             value = getattr(self, name)
-            if isinstance(value, cls):
-                yield value
+            if cls:
+                if isinstance(value, cls):
+                    yield value
+            elif sub:
+                if isinstance(value, type) and issubclass(value, sub):
+                    yield value
 
     def parse(self, arguments):
         """Parse all known arguments, populating the `args` dict."""
@@ -127,9 +167,11 @@ class Command(object):
                 break
         return c != consumers[0].remaining()
 
-    def run(self, arguments):
+    def run(self, arguments=None):
         """Parse arguments and invoke resulting actions."""
 
+        if arguments is None:
+            arguments = sys.argv[1:]
         self.parse(arguments)
         self._run()
 

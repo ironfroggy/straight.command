@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
+try:
+    unicode
+except NameError:
+    unicode = str
 
 import sys
 from straight.command import Command, Option, SubCommand
