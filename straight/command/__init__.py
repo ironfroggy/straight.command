@@ -24,6 +24,7 @@ class _FLAG(object):
         self.f = f
     def __bool__(self):
         return bool(self.f)
+    __nonzero__ = __bool__
 
 _NO_CONST = _FLAG()
 _NO_DEFAULT = _FLAG(False)
@@ -67,12 +68,16 @@ class Command(object):
     """
 
     version = "unknown"
+    subcommand = None # 'required' or default
+    default = False # If this is a default subcommand
 
     def __init__(self, parent=None):
         self.parent = parent
         self.options = []
         self.consumers = []
         self.args = Arguments(parent=parent)
+
+        self.ran_subcommand = None
 
         self.loadOptions('straight.command')
 
@@ -210,7 +215,24 @@ class Command(object):
             self.execute(**self.args)
 
     def execute(self, **kwargs):
-        pass
+        if not self.ran_subcommand:
+            default_subcommand = None
+            for opt in self.options:
+                if isinstance(opt, SubCommand) and opt.command_class.default:
+                    if default_subcommand is None:
+                        default_subcommand = opt
+                    else:
+                        print("Error: Found conflicting default subcommands!")
+                        sys.exit(1)
+            if default_subcommand is None:
+                if self.subcommand == 'required':
+                    for opt in self.options:
+                        if opt.long == '--help':
+                            opt.run(self)
+                            break
+                    sys.exit(1)
+            else:
+                default_subcommand.run(self, as_default=True)
 
 
 class Consumer(object):
@@ -405,8 +427,17 @@ class Option(object):
 
         if ns.get(self.dest) is None:
             ns[self.dest] = []
-        value = consumer.consume(mode)
-        ns[self.dest].append(value)
+        while True:
+            try:
+                next_value = consumer.peek()
+                if next_value.startswith('-'):
+                    # Looks like another option, stop consuming
+                    break
+            except IndexError:
+                break
+            else:
+                value = consumer.consume(mode)
+                ns[self.dest].append(value)
 
     def run(self, cmd):
         """An Option subclass can define `run()` to invoke some behavior
@@ -459,9 +490,12 @@ class SubCommand(Option):
                 self.subcmd_args = consumer.args[:]
                 consumer.args[:] = []
 
-    def run(self, cmd):
+    def run(self, cmd, as_default=False):
         """Runs the subcommand."""
 
+        if as_default:
+            self.subcmd_args = []
         if self.subcmd_args is not None:
             self.subcmd = self.command_class(parent=cmd)
             self.subcmd.run(self.subcmd_args)
+            cmd.ran_subcommand = self.subcmd
