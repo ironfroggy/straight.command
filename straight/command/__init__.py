@@ -70,6 +70,7 @@ class Command(object):
     version = "unknown"
     subcommand = None # 'required' or default
     default = False # If this is a default subcommand
+    option_ns = None # Defines secondary plugin namespace
 
     def __init__(self, parent=None):
         self.parent = parent
@@ -80,6 +81,8 @@ class Command(object):
         self.ran_subcommand = None
 
         self.loadOptions('straight.command')
+        if self.option_ns:
+            self.loadOptions(self.option_ns)
 
         self.options.sort(key=lambda opt: opt.index_for(self))
 
@@ -101,12 +104,15 @@ class Command(object):
         from_attributes = self._getAttributes(Option)
         from_nested_commands = self._getAttributes(sub=Command)
         from_plugins = self._getPlugins(namespace, Option)
+        from_plugins_subcmds = self._getPlugins(namespace, SubCommand)
 
         nested_subcommands = []
         for command in from_nested_commands:
             nested_subcommands.append(
                 SubCommand(command.__name__.lower().replace('_', '-'), command)
             )
+
+        nested_subcommands.extend(from_plugins_subcmds)
 
         self.options.extend(from_attributes)
         self.options.extend(nested_subcommands)
@@ -116,7 +122,8 @@ class Command(object):
         """Utility to load and instansiate a set of plugins."""
 
         for plugin in load(namespace, subclasses=cls):
-            yield plugin()
+            if plugin.__module__ != "straight.command":
+                yield plugin()
 
     def _getAttributes(self, cls=None, sub=None):
         """Utility to locate class-defined options."""
@@ -473,7 +480,9 @@ class SubCommand(Option):
 
         if not self.name or not self.command_class:
             raise TypeError("{0.__class__.__name__} requires both "
-                "`name` and `command_class`.".format(self))
+                "`name` and `command_class` "
+                "(name={0.name}, command_class={0.command_class})"
+                .format(self))
 
     def parse(self, consumer, ns):
         """Consumes ALL remaining arguments and prepares to send them to the
